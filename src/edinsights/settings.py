@@ -1,17 +1,11 @@
-# Django settings for djanalytics project.
+# Django settings for edinsights project.
 
 #### Additional setting required for core
 
 import datetime
 
-DJOBJECT_CONFIG = [{}, {'baseurl' : 'http://127.0.0.1:9022/'}]
+# DJOBJECT_CONFIG = [{}, {'baseurl' : 'http://127.0.0.1:9022/'}]
 
-DJ_REQUIRED_APPS = ( 'djeventstream.httphandler',
-    'djcelery',
-    'south',
-    'core',
-    'modulefs',
-    'modules',)
 
 # Types of parameters that queries and views can take. 
 # This is not properly used yet. 
@@ -25,10 +19,6 @@ DJFS = { 'type' : 'osfs',
 TIME_BETWEEN_DATA_REGENERATION = datetime.timedelta(minutes=1)
 
 INSTALLED_ANALYTICS_MODULES = ('modules.testmodule',)
-
-#Initialize celery
-import djcelery
-djcelery.setup_loader()
 
 SNS_SUBSCRIPTIONS = []
 
@@ -54,14 +44,7 @@ DATABASES = {
     }
 }
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'analytics-experiments'
-    }
-}
-
-# Hosts/domain names that are valid for this site; required if DEBUG is False
+# Hosts/domain names that are for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = []
 
@@ -69,7 +52,7 @@ ALLOWED_HOSTS = []
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
 # although not all choices may be available on all operating systems.
 # In a Windows environment this must be set to your system time zone.
-TIME_ZONE = 'America/Chicago'
+TIME_ZONE = 'America/New_York'
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
@@ -143,13 +126,21 @@ MIDDLEWARE_CLASSES = (
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
-ROOT_URLCONF = 'djanalytics.urls'
+ROOT_URLCONF = 'edinsights.urls'
 
 TEMPLATE_DIRS = (
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
 )
+
+DJ_REQUIRED_APPS = ( 'djeventstream.httphandler',
+    'djcelery',
+    'south',
+    'core',
+    'modulefs',
+    'modules',
+    'periodic',)
 
 INSTALLED_APPS = (
     'django.contrib.auth',
@@ -192,3 +183,36 @@ LOGGING = {
         },
     }
 }
+
+# # By default timezone-related warnings do not display the location in code
+# # where they occurred. The code below will turn these warnings into
+# # exceptions with stack trace so that one can identify the offending code.
+# # Uncomment to turn timezone warnings into exceptions
+# import warnings
+# warnings.filterwarnings(
+#        'error', r"DateTimeField received a naive datetime",
+#        RuntimeWarning, r'django\.db\.models\.fields')
+
+#initialize celery
+import djcelery
+djcelery.setup_loader()
+#import the settings for celery from the edinsights module and for cache
+
+try: 
+    from celerysettings_dev import *
+    from djangocachesettings_dev import *
+except: 
+    # The code had the imports below. These fail when running test 
+    # cases stand-alone. I think the above fixes this, but I'm 
+    # leaving this in for now in case there are configurations I 
+    # haven't thought of. If the exception is raised, remove this
+    # comment, remove the exception, and add a comment explaining
+    # when the second set of imports is necessary. 
+    #
+    # If it's, say, October, and no one has run into the exception, 
+    # we should kill the extra code. 
+    # 
+    # pmitros -- 21/July/2013. 
+    raise Exception("Import failed. See instructions in settings.py")
+    from edinsights.djangocachesettings_dev import *
+    from edinsights.celerysettings_dev import *

@@ -6,7 +6,7 @@ log=logging.getLogger(__name__)
 event_handlers = []
 request_handlers = {'view':{}, 'query':{}}
 
-from djanalytics.core.views import default_optional_kwargs
+from edinsights.core.util import default_optional_kwargs
 funcskips = default_optional_kwargs.keys()+['params'] # params are additional GET/POST parameters
 
 def register_handler(cls, category, name, description, f, args):
@@ -33,11 +33,21 @@ def register_handler(cls, category, name, description, f, args):
                 category+="+"
     if cls not in request_handlers:
         request_handlers[cls] = {}
-    if name in request_handlers[cls]:
-        # We used to have this be an error.
-        # We changed to a warning for the way we handle dummy values.
-        log.warn("{0} already in {1}".format(name, category))  # raise KeyError(name+" already in "+category)
-    request_handlers[cls][name] = {'function': f, 'name': name, 'doc': description, 'category' : category}
+
+    # We may want to register under multiple names. E.g. 
+    # edx.get_grades and (once adopted globally) generic 
+    # get_grades
+    if isinstance(name, list):
+        names = name
+    else:
+        names = [name]
+    for n in names: 
+        if n in request_handlers[cls]:
+            # We used to have this be an error.
+            # We changed to a warning for the way we handle dummy values.
+            log.warn("{0} already in {1}".format(n, category))  # raise KeyError(name+" already in "+category)
+
+        request_handlers[cls][n] = {'function': f, 'name': n, 'doc': description, 'category' : category}
 
 class StreamingEvent:
     ''' Event object. Behaves like the normal JSON event dictionary,
@@ -91,6 +101,8 @@ def register_event_property(f, name, description):
     event_property_registry[name] = {'function': f, 'name': name, 'doc': description}
 
 def schema_helper():
+    ''' Return all endpoints (returned in a format identical to schema view)
+    '''
     endpoints = []
     for cls in request_handlers:
         for name in request_handlers[cls]:
@@ -112,6 +124,6 @@ def handle_request(cls, name, **kwargs):
     else:
         arglist = inspect.getargspec(handler).args
 
-    from util import optional_parameter_call, default_optional_kwargs
-    return optional_parameter_call(handler, default_optional_kwargs, kwargs, arglist)
+    from util import optional_parameter_call
+    return optional_parameter_call(handler, kwargs, arglist)
 

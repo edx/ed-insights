@@ -13,7 +13,6 @@ from django.conf import settings
 from djeventstream.signals import event_received
 
 from registry import event_handlers, request_handlers
-from util import default_optional_kwargs
 
 import auth
 import util
@@ -75,17 +74,16 @@ def handle_query(request, name, **kwargs):
     global query_object
     if query_object is None: 
         from util import get_query
-        view_object = get_query(None)
+        query_object = get_query(None)
     if name[0] == '_':
         raise SuspiciousOperation(name+' called')
     kwargs.update(request.POST.items())
     kwargs.update(request.GET.items())
     results = query_object.__getattr__(name)(**kwargs)
-    try:
-        results = json.dumps(results)
-    except:
-        pass
-    return HttpResponse(results)
+    if isinstance(results, basestring):
+        return HttpResponse(results)
+    else:
+        return HttpResponse(json.dumps(results))
 
 @receiver(event_received)
 def handle_event(sender, **kwargs):
@@ -98,6 +96,7 @@ def handle_event(sender, **kwargs):
     This is not a view, but it is the moral equivalent. 
     '''
     # Handle strings, lists, and dictionaries
+    # TODO handle errors if not valid json
     msg = kwargs['msg']
     if isinstance(msg,str) or isinstance(msg,unicode):
         msg = json.loads(msg)
@@ -124,12 +123,12 @@ def handle_event(sender, **kwargs):
         if not batch: ## Message was a list of events, but handler cannot batch events
             for event in msg:
                 try:
-                    optional_parameter_call(event_func, default_optional_kwargs, {'events':[event]})
+                    optional_parameter_call(event_func, {'events':[event]})
                 except:
                     handle_event_exception(e['function'])
         else: ## Message was a list of events, and handler can batch events
             try:
-                optional_parameter_call(event_func, default_optional_kwargs, {'events':msg})
+                optional_parameter_call(event_func, {'events':msg})
             except:
                 handle_event_exception(e['function'])
 

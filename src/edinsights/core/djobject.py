@@ -1,4 +1,4 @@
-''' This is a generic interface to djanalytics. It presents views,
+''' This is a generic interface to edinsights. It presents views,
 etc. as Python objects. 
 
 This is prototype-grade code. 
@@ -15,7 +15,7 @@ import requests
 import urllib
 
 def http_rpc_helper(baseurl, view_or_query, function, headers = {}, timeout = None):
-    ''' Make an RPC call to a remote djanalytics instance
+    ''' Make an RPC call to a remote edinsights instance
     '''
     if baseurl: 
         baseembedurl = baseurl+view_or_query+"/"
@@ -39,11 +39,11 @@ def http_rpc_helper(baseurl, view_or_query, function, headers = {}, timeout = No
     return rpc_call
 
 def local_call_helper(view_or_query, function):
-    ''' Make a call (functionally identical to RPC) to the local djanalytics instance
+    ''' Make a call (functionally identical to RPC) to the local edinsights instance
     '''
-    import djanalytics.core.registry
+    import edinsights.core.registry
     def rpc_call(**kwargs):
-        return djanalytics.core.registry.handle_request(view_or_query, function, **kwargs)
+        return edinsights.core.registry.handle_request(view_or_query, function, **kwargs)
     return rpc_call
 
 class multi_embed():
@@ -57,7 +57,7 @@ class multi_embed():
     def __init__(self, embeds):
         self._embeds = embeds
     def __getattr__(self, attr):
-        print ">>>>>>>>>>>>> Getting", attr
+#        print ">>>>>>>>>>>>> Getting", attr
         for x in self._embeds:
             f = None
             try:
@@ -65,11 +65,11 @@ class multi_embed():
             except AttributeError:
                 pass
             if f:
-                print
-                print ">>>>>>>>>>>>>>>>>>>", f
-                print
+#                print
+#                print ">>>>>>>>>>>>>>>>>>>", f
+#                print
                 return f
-        print "Not found"
+        print "Not found", attr
         raise AttributeError(attr)
 
     def _refresh_schema(self):
@@ -77,7 +77,7 @@ class multi_embed():
             x._refresh_schema
     def __dir__(self):
         child_dirs = [x.__dir__() for x in self._embeds]
-        print child_dirs
+#        print child_dirs
         return sorted(list(set(sum(child_dirs, []))))
     def __repr__(self):
         return "/".join(map(lambda x:repr(x), self._embeds))
@@ -131,8 +131,8 @@ class single_embed(object):
                 url = self._baseurl+"schema"
                 self._schema = json.loads(requests.get(url).content)
             else: 
-                import djanalytics.core.registry
-                self._schema = djanalytics.core.registry.schema_helper()
+                import edinsights.core.registry
+                self._schema = edinsights.core.registry.schema_helper()
 
     def __getattr__(self, attr):
         ## Disallow internal. This is necessary both for analytics,
@@ -249,26 +249,28 @@ class transform_embed(object):
         return "Secure ["+self._transform_policy['name']+"]:"+self._embed.__repr__()
 
 def get_embed(t, config = None):
-    if config: # untested code path
+    if config: 
         embeds = []
         for embed_spec in config:
+#            print embed_spec
             embeds.append(single_embed(t, **embed_spec))
-        print "Multi"
         return multi_embed(embeds)
-    print "Single"
     return single_embed(t)
                                 
 class djobject():
+    ## djobject, you should ignore. Use view and query objects directly.
+    ## Combining the two in this way is probably not a good abstraction
+    ## (I could be wrong; just current intuition).
     def __init__(self, baseurl = None, headers = {}):
         self.view = single_embed('view', baseurl = baseurl, headers = headers)
         self.query = single_embed('query', baseurl = baseurl, headers = headers)
 
 if __name__ == "__main__":
     djo = djobject(baseurl = "http://127.0.0.1:8000/")
-    if True: # Internal test -- from djanalytics
+    if True: # Internal test -- from edinsights
         print djo.query.djt_event_count()
         print djo.query.djt_user_event_count(user = "bob")
-        print djo.query.__dir__()
+        print dir(djo.query)
 
     if False: # External test -- from edxanalytics
         transform_policy = {'name': 'test',
@@ -276,13 +278,13 @@ if __name__ == "__main__":
                             'policy' : { 'total_user_count' : 'allow', 
                                          'user_count' : 'allow',
                                          'dash' : 'deny', 
-                                         'page_count' : ['user'] }
+                                         'page_count' : ['user'] } # List of parameters to lock down
                             }
         
         context = { 'user' : 'bob',
                     'course' : '6.002x' }
         
         secure_view = transform_embed(transform_policy, context, djo.view)
-        print secure_view.__dir__()
+        print dir(secure_view)
         print secure_view.page_count(course = '6.002x')
         print inspect.getargspec(secure_view.page_count)

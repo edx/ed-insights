@@ -1,63 +1,64 @@
-''' Basic module containing events, views, and queries for the test suite.
+''' Basic module containing events, views, and queries for the test suite. 
 
 '''
 
 modules_to_import = []
 
-from djanalytics.core.decorators import query, event_handler, view, event_property
+from edinsights.core.decorators import query, event_handler, view, event_property
 
 @view()
 def djt_hello_template():
-    from djanalytics.core.render import render
+    ''' Example of how to use mako templates in a view '''
+    from edinsights.core.render import render
     return render("hello.html", {})
 
 @query()
-def djt_event_count(db):
+def djt_event_count(mongodb):
     ''' Number of hits to event_handler since clear_database
     '''
-    collection = db['event_count']
+    collection = mongodb['event_count']
     t = list(collection.find())
     if len(t):
         return t[0]['event_count']
     return 0
 
 @query()
-def djt_user_event_count(db, user):
+def djt_user_event_count(mongodb, user):
     ''' Number of hits by a specific user to event_handler since
     clear_database
     '''
-    collection = db['user_event_count']
+    collection = mongodb['user_event_count']
     t = list(collection.find({'user':user}))
     if len(t):
         return t[0]['event_count']
     return 0
 
 @query()
-def djt_clear_database(db):
+def djt_clear_database(mongodb):
     ''' Clear event counts
     '''
-    collection = db['event_count']
+    collection = mongodb['event_count']
     collection.remove({})
-    collection = db['user_event_count']
+    collection = mongodb['user_event_count']
     collection.remove({})
     return "Database clear"
 
 @event_handler()
-def djt_event_count_event(db, events):
+def djt_event_count_event(mongodb, events):
     ''' Count events per user and per system. Used as test case for
     per-user and global queries. '''
     for evt in events:
         if 'user' in evt:
-            collection = db['user_event_count']
+            collection = mongodb['user_event_count']
             user = evt['user']
             t = list(collection.find({'user' : user}))
-            if len(t):
+            if len(t): 
                 collection.update({'user' : user}, {'$inc':{'event_count':1}})
             else:
                 collection.insert({'event_count' : 1, 'user' : user})
-        collection = db['event_count']
+        collection = mongodb['event_count']
         t = list(collection.find())
-        if len(t):
+        if len(t): 
             collection.update({}, {'$inc':{'event_count':1}})
         else:
             collection.insert({'event_count' : 1})
@@ -65,18 +66,18 @@ def djt_event_count_event(db, events):
 
 @event_handler()
 def djt_python_fs_forgets(fs, events):
-    ''' Test case for checking whether the file system properly forgets.
-    To write a file:
+    ''' Test case for checking whether the file system properly forgets. 
+    To write a file: 
 
-    { 'fs_forgets_contents' : True,
+    { 'fs_forgets_contents' : True, 
       'filename' : "foo.txt",
       'contents' : "hello world!"}
 
-    To set or change expiry on a file:
-    { 'fs_forgets_expiry' : -5,
+    To set or change expiry on a file: 
+    { 'fs_forgets_expiry' : -5, 
       'filename' : "foo.txt"}
 
-    The two may be combined into one operation.
+    The two may be combined into one operation. 
     '''
     def djt_checkfile(filename, contents):
         if not fs.exists(filename):
@@ -90,7 +91,7 @@ def djt_python_fs_forgets(fs, events):
             f.write(evt['fs_forgets_contents'])
             f.close()
         if 'fs_forgets_expiry' in evt:
-            try:
+            try: 
                 fs.expire(evt['filename'], evt['fs_forgets_expiry'])
             except:
                 print "Failed"
@@ -101,7 +102,7 @@ def djt_python_fs_forgets(fs, events):
 @event_handler()
 def djt_python_fs_event(fs, events):
     ''' Handles events which will create and delete files in the
-    filesystem.
+    filesystem. 
     '''
     for evt in events:
         if 'event' in evt and evt['event'] == 'pyfstest':
@@ -109,25 +110,27 @@ def djt_python_fs_event(fs, events):
                 f=fs.open(evt['create'], 'w')
                 f.write(evt['contents'])
                 f.close()
-            if 'delete' in evt and fs.exists(evt['delete']):
+            if 'delete' in evt and fs.exists(evt['delete']): 
                 fs.remove(evt['delete'])
 
 @query()
 def djt_readfile(fs, filename):
-    ''' Return the contents of a file in the fs.
+    ''' Return the contents of a file in the fs. 
     '''
-    if fs.exists(filename):
+    if fs.exists(filename): 
         f=fs.open(filename)
         return f.read()
     return "File not found"
 
 @query()
 def djt_cache_get(cache, key):
+    ''' Used in test case for cache '''
     result = cache.get(key)
     return result
 
 @event_handler()
 def djt_cache_set(cache, events):
+    ''' Used in test case for cache '''
     for evt in events:
         if 'event' in evt and evt['event'] == 'cachetest':
             cache.set(evt['key'], evt['value'], evt['timeout'])
@@ -145,17 +148,31 @@ def djt_agent(event):
 
 @event_handler()
 def djt_event_property_check(cache, events):
+    ''' Used in test case for event handler '''
     for evt in events:
         if "event_property_check" in evt:
             cache.set("last_seen_user", evt.djt_agent, 30)
 
 @query()
 def djt_fake_user_count():
+    ''' Used as test case for query objects '''
     return 2
 
 @view()
 def djt_fake_user_count(query):
     ''' Test of an abstraction used to call queries, abstracting away
-    the network, as well as optional parameters like fs, db, etc.
+    the network, as well as optional parameters like fs, db, etc. 
     '''
     return "<html>Users: {uc}</html>".format(uc = query.djt_fake_user_count())
+
+@query(name=['djt_three_name', 'edx_djt_three_name', 'edx.djt_three_name'])
+def djt_three_name():
+    return "I have three names"
+
+@query(name = 'djt_check_three_name')
+def check_three_name(query):
+    if query.djt_three_name() != "I have three names":
+        raise Exception("oops")
+    if query.edx_djt_three_name() != "I have three names":
+        raise Exception("oops")
+    return "Works"
